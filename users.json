@@ -1,0 +1,10 @@
+{
+  "users": [
+    {
+      "username": "admin",
+      "passwordHash": "scrypt$b894affe91a38dfb6a51849396f4e703$963670fdf51c5de7252c69338a7d750193e4edd1731923ec4a3ca43abbaa79822dcded7197c6539d9a4ee611f44a650fc4355cab8e7454c51993e21cc80c37d4",
+      "mustChange": true,
+      "createdAt": "2026-11-08T17:48:18.033Z"
+    }
+  ]
+}
