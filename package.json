@@ -1,0 +1,12 @@
+{
+  "name": "hair-clinic-ads-dashboard",
+  "version": "1.0.0",
+  "description": "Dashboard for Facebook ads, chat quality and sales of a hair transplant clinic (demo data + Meta Marketing API ready)",
+  "private": true,
+  "main": "server.js",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/run.js"
+  }
+}
