@@ -3,7 +3,8 @@
   "meta": {
     "appId": "",
     "adAccountId": "",
-    "apiVersion": "v21.0"
+    "apiVersion": "v21.0",
+    "webhookVerifyToken": "3c4b556cd2e95a8f290a0931bca7e552"
   },
   "mode": "demo"
 }

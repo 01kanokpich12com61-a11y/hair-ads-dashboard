@@ -24,6 +24,7 @@ module.exports = {
   adminPassword: process.env.ADMIN_PASSWORD || 'admin1234',
   usingDefaultPassword: !process.env.ADMIN_PASSWORD,
   secureCookie: process.env.COOKIE_SECURE === '1',
-  metaApiVersion: process.env.META_API_VERSION || 'v21.0',
+  metaApiVersion: process.env.META_API_VERSION || 'v25.0',
+  trustProxy: process.env.TRUST_PROXY === '1', // อยู่หลัง Nginx/Caddy: ใช้ X-Forwarded-For เป็น IP ลูกค้า
   tzOffsetHours: 7, // Asia/Bangkok
 };

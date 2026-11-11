@@ -13,9 +13,9 @@ function rng(seed) {
 }
 
 const pages = [
-  { id: 'P1', name: 'BEQ GROUP Bangkok' },
-  { id: 'P2', name: "BEQ GROUP Women's Hair" },
-  { id: 'P3', name: 'BEQ GROUP Phuket' },
+  { id: 'P1', name: 'Hairlab Clinic Bangkok' },
+  { id: 'P2', name: "Hairlab Women's Hair" },
+  { id: 'P3', name: 'Hairlab Phuket' },
 ];
 const agencies = [
   { id: 'A1', name: 'In-house' },
@@ -65,6 +65,9 @@ const initials = ['ส', 'ว', 'ก', 'ธ', 'พ', 'ป', 'จ', 'ม', 'ร',
 const dropReasons = ['ราคาสูงเกินไป', 'ไม่สะดวกเดินทาง', 'เปรียบเทียบคลินิกอื่น', 'ไม่ตอบกลับ', 'แค่สอบถามข้อมูล', 'ขอเวลาตัดสินใจ'];
 
 const HISTORY_DAYS = 200; // เผื่อเทียบช่วงก่อนหน้า 90 วัน
+// ความคืบหน้าของแชท -> คุณภาพแชทที่ใช้สรุปในตารางโฆษณา
+const QUALITY = { qualified: 'good', in_progress: 'good', talked: 'average', very_poor: 'poor', no_reply: 'poor' };
+const poorReasons = dropReasons.filter((r) => r !== 'ไม่ตอบกลับ');
 let cache = null;
 
 function build() {
@@ -111,28 +114,31 @@ function build() {
     const ad = ads.find((a) => (r -= a.weight) <= 0) || ads[0];
     const date = addDays(t, -Math.floor(Math.pow(rand(), 1.1) * 100));
     const qr = rand();
-    const quality = qr < ad.quality ? 'good' : qr < ad.quality + (1 - ad.quality) * 0.55 ? 'average' : 'poor';
+    const tier = qr < ad.quality ? 'good' : qr < ad.quality + (1 - ad.quality) * 0.55 ? 'average' : 'poor';
     const weights = {
-      good: { closed: 35, booked: 30, contacted: 20, dropped: 10, new: 5 },
-      average: { closed: 12, booked: 22, contacted: 30, dropped: 26, new: 10 },
-      poor: { closed: 2, booked: 6, contacted: 22, dropped: 55, new: 15 },
-    }[quality];
-    const recent = date >= addDays(t, -1);
-    let pick = rand() * Object.values(weights).reduce((a, b) => a + b, 0);
-    let status = recent ? (rand() < 0.6 ? 'new' : 'contacted') : Object.keys(weights).find((k) => (pick -= weights[k]) <= 0);
-    status = status || 'contacted';
+      good: { qualified: 38, in_progress: 32, talked: 18, very_poor: 4, no_reply: 8 },
+      average: { qualified: 12, in_progress: 26, talked: 36, very_poor: 12, no_reply: 14 },
+      poor: { qualified: 2, in_progress: 8, talked: 20, very_poor: 34, no_reply: 36 },
+    }[tier];
+    let pick = rand() * Object.values(weights).reduce((x, y) => x + y, 0);
+    let status = Object.keys(weights).find((k) => (pick -= weights[k]) <= 0) || 'talked';
+    if (date >= addDays(t, -1) && status !== 'no_reply') status = rand() < 0.5 ? 'in_progress' : 'talked';
+    const cr = rand();
+    const channel = cr < 0.52 ? 'Messenger' : cr < 0.82 ? 'LINE' : cr < 0.95 ? 'Instagram' : 'WhatsApp';
     const [lo, hi] = camp[ad.campaignId].price;
+    const bought = status === 'qualified' && rand() < 0.45;
     leads.push({
       id: `L-${String(n).padStart(4, '0')}`,
       name: `คุณ${firstNames[Math.floor(rand() * firstNames.length)]} ${initials[Math.floor(rand() * initials.length)]}.`,
       adId: ad.id,
-      date,
+      channel,
+      date, // วันที่เริ่มคุย
       repId: reps[Math.floor(rand() * reps.length)].id,
-      quality,
+      quality: QUALITY[status],
       status,
-      value: status === 'closed' ? Math.round((lo + rand() * (hi - lo)) / 500) * 500 : 0,
-      firstResponseMin: Math.round(2 + rand() * rand() * 58),
-      dropReason: status === 'dropped' ? dropReasons[Math.floor(rand() * dropReasons.length)] : null,
+      value: bought ? Math.round((lo + rand() * (hi - lo)) / 500) * 500 : 0,
+      firstResponseMin: status === 'no_reply' ? null : Math.round(2 + rand() * rand() * 58),
+      dropReason: status === 'very_poor' ? poorReasons[Math.floor(rand() * poorReasons.length)] : status === 'no_reply' ? 'ไม่ตอบกลับ' : null,
     });
   }
   leads.sort((a, b) => (a.date < b.date ? 1 : -1));
@@ -146,4 +152,96 @@ function load() {
   return cache.data;
 }
 
-module.exports = { load };
+
+// ---------- ข้อความแชทตัวอย่าง (สร้างจากรหัสลีด ผลเหมือนเดิมทุกครั้ง) ----------
+const OPENERS = {
+  C1: ['สวัสดีครับ สนใจปลูกผมแบบ FUE ครับ', 'ผมเริ่มผมบางตรงหน้าผาก อยากทราบราคาปลูกผมครับ'],
+  C2: ['สนใจโปร PRP ลด 50% ค่ะ ยังมีอยู่ไหมคะ', 'อยากทำ PRP ลดผมร่วงค่ะ ราคาเท่าไหร่คะ'],
+  C3: ['ขอปรึกษาฟรีหน่อยครับ ผมบางมาหลายปีแล้ว', 'สนใจนัดปรึกษาแพทย์ฟรีค่ะ ต้องทำยังไงคะ'],
+  C4: ['ผมบางช่วงกลางศีรษะค่ะ ปรึกษาได้ไหมคะ', 'อยากตรวจหนังศีรษะฟรีค่ะ ต้องทำยังไงคะ'],
+  C5: ['สนใจปลูกหนวดเคราครับ ราคาเริ่มต้นเท่าไหร่', 'อยากปลูกคิ้วให้ดูเป็นธรรมชาติค่ะ ราคาเท่าไหร่คะ'],
+  C6: ['เคยดูโฆษณาไว้ อยากสอบถามแพ็กเกจเพิ่มเติมครับ', 'สนใจแพ็กเกจที่เคยเห็นค่ะ ขอรายละเอียดหน่อยค่ะ'],
+};
+const POOR_REPLY = {
+  'ราคาสูงเกินไป': (p) => `แพงไปหน่อยนะ${p} ขอคิดดูก่อน`,
+  'ไม่สะดวกเดินทาง': (p) => `อยู่ต่างจังหวัด ไม่สะดวกเดินทางมาที่คลินิก${p}`,
+  'เปรียบเทียบคลินิกอื่น': (p) => `ขอเปรียบเทียบกับที่อื่นก่อนนะ${p}`,
+  'แค่สอบถามข้อมูล': (p) => `แค่ถามดูเฉยๆ ${p} ขอบคุณมาก${p}`,
+  'ขอเวลาตัดสินใจ': (p) => `ขอเวลาตัดสินใจก่อนนะ${p}`,
+};
+
+function conversation(lead, data) {
+  const rand = rng(Number(String(lead.id).replace(/\D/g, '')) * 7919 + 13);
+  const ad = data.ads.find((a) => a.id === lead.adId);
+  const camp = campaigns.find((c) => c.id === (ad && ad.campaignId)) || campaigns[0];
+  const pick = (arr) => arr[Math.floor(rand() * arr.length)];
+  const fmt = (n) => Number(n).toLocaleString('en-US');
+  const tdy = today();
+  const msgs = [];
+  let day = 0; let cur = 9 * 60 + Math.floor(rand() * 10 * 60); let stopped = false;
+  const hhmm = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+  const say = (from, text, gap) => {
+    if (stopped) return;
+    cur += gap;
+    if (cur > 22 * 60) { day += 1; cur = 9 * 60 + Math.floor(rand() * 90); }
+    const date = addDays(lead.date, day);
+    if (date > tdy) { stopped = true; return; }
+    msgs.push({ from, text, at: `${date} ${hhmm(cur)}` });
+  };
+
+  const opener = pick(OPENERS[camp.id] || OPENERS.C3);
+  const p = /ค่ะ|คะ/.test(opener) ? 'ค่ะ' : 'ครับ';
+  const q = p === 'ค่ะ' ? 'คะ' : 'ครับ';
+  const info = pick([`บริเวณหน้าผากกับกลางศีรษะ${p} เป็นมาประมาณ 3 ปี`, `ผมร่วงเยอะช่วงปีที่ผ่านมา${p} โดยเฉพาะด้านบน`, `เหม่งขึ้นมา 2 ปีแล้ว${p}`]);
+  const price = `ราคาขึ้นอยู่กับการประเมินของแพทย์ เบื้องต้นเริ่มที่ประมาณ ${fmt(camp.price[0])} บาท และไม่เกิน ${fmt(camp.price[1])} บาท ค่ะ`;
+
+  say('customer', opener, 0);
+  say('staff', `สวัสดีค่ะ ${lead.name} ขอบคุณที่สนใจ Hairlab Clinic ค่ะ ไม่ทราบว่าสนใจบริเวณไหน และเป็นมานานเท่าไหร่แล้วคะ`, lead.firstResponseMin ?? 6);
+
+  switch (lead.status) {
+    case 'no_reply':
+      say('staff', `ขออนุญาตติดตามนะคะ ${lead.name} ยังสนใจให้ทีมงานประเมินเบื้องต้นให้ไหมคะ`, 700);
+      say('staff', 'ทางคลินิกมีนัดตรวจกับแพทย์ฟรีสัปดาห์นี้ค่ะ หากสะดวกทักกลับได้เลยนะคะ', 1500);
+      break;
+    case 'very_poor':
+      say('customer', info, 8);
+      say('staff', price, 5);
+      say('customer', (POOR_REPLY[lead.dropReason] || POOR_REPLY['ขอเวลาตัดสินใจ'])(p), 15);
+      say('staff', 'ได้เลยค่ะ หากต้องการข้อมูลเพิ่มเติม ทักมาได้ตลอดนะคะ', 4);
+      break;
+    case 'talked':
+      say('customer', info, 6);
+      say('staff', price, 5);
+      say('customer', `ใช้เวลาฟื้นตัวนานไหม${q}`, 12);
+      say('staff', 'โดยทั่วไปกลับไปทำงานได้ภายใน 3-5 วันค่ะ ผลลัพธ์จะเห็นชัดขึ้นเรื่อยๆ ภายใน 6-12 เดือน', 6);
+      say('customer', `โอเค${p} เดี๋ยวขอคิดดูแล้วทักกลับนะ${p}`, 10);
+      say('staff', 'ได้เลยค่ะ ถ้าต้องการนัดตรวจกับแพทย์แจ้งได้เลยนะคะ', 3);
+      break;
+    case 'in_progress':
+      say('customer', info, 6);
+      say('staff', price, 5);
+      say('customer', `ขอนัดปรึกษากับหมอได้ไหม${q}`, 9);
+      say('staff', 'ได้ค่ะ ตอนนี้ว่างวันพฤหัสกับวันเสาร์ สะดวกวันไหนคะ', 4);
+      say('customer', `ขอดูตารางช่วงบ่ายก่อนนะ${p}`, 11);
+      say('staff', 'ได้ค่ะ เดี๋ยวส่งตารางเวลาให้ทางแชทนะคะ รอยืนยันวันที่สะดวกอีกครั้งค่ะ', 5);
+      break;
+    case 'qualified': {
+      say('customer', info, 6);
+      say('staff', price, 5);
+      say('customer', `งบประมาณประมาณ ${fmt(Math.round((camp.price[0] + (camp.price[1] - camp.price[0]) * 0.4) / 5000) * 5000)} บาท${p} อยากเริ่มเร็วที่สุด`, 8);
+      say('staff', 'ตรงตามเงื่อนไขค่ะ ขอนัดตรวจกับแพทย์ก่อนเพื่อประเมินจำนวนที่เหมาะสม ว่างวันพฤหัสกับวันเสาร์ค่ะ', 5);
+      say('customer', `วันเสาร์บ่ายสองได้${p}`, 7);
+      say('staff', 'ยืนยันนัดเรียบร้อยค่ะ เดี๋ยวส่งแผนที่และขั้นตอนก่อนเข้าพบให้ทางแชทนะคะ', 3);
+      if (lead.value > 0) {
+        say('staff', `เพื่อจองคิวแพทย์ รบกวนชำระมัดจำ 5,000 บาทค่ะ ยอดรวมโปรแกรมประมาณ ${fmt(lead.value)} บาท`, 1500);
+        say('customer', `โอนแล้ว${p} [ส่งสลิป]`, 25);
+        say('staff', 'ได้รับยอดมัดจำเรียบร้อยแล้วค่ะ ขอบคุณมากค่ะ แล้วพบกันนะคะ', 6);
+      }
+      break;
+    }
+    default:
+  }
+  return msgs;
+}
+
+module.exports = { load, conversation };

@@ -4,7 +4,7 @@
 // สิทธิ์ที่ต้องมี: ads_read, read_insights  (ถ้าต้องการชื่อเพจ: pages_show_list / pages_read_engagement)
 const config = require('./config');
 const store = require('./store');
-const { diffDays } = require('./dates');
+const { diffDays, stampMs } = require('./dates');
 
 const CACHE_MS = 10 * 60 * 1000;
 const cache = new Map();
@@ -168,9 +168,57 @@ async function load({ from, to }) {
   return data;
 }
 
-function clearCache() { cache.clear(); }
+/* ---------- Messenger (ส่งข้อความ / ดึงชื่อลูกค้า) ---------- */
+const pageTokens = new Map(); // pageId -> { token, at }
+
+// ขอ Page Access Token จาก token หลัก (System User ที่ได้สิทธิ์ในเพจ + pages_messaging)
+async function pageToken(pageId, m) {
+  const hit = pageTokens.get(pageId);
+  if (hit && Date.now() - hit.at < 30 * 60 * 1000) return hit.token;
+  const r = await graph(pageId, { fields: 'access_token' }, m.accessToken, m.apiVersion || config.metaApiVersion);
+  if (!r.access_token) throw new MetaError('ไม่ได้รับ Page token — ตรวจว่า System User ถูกเพิ่มเข้าเพจและมีสิทธิ์ pages_messaging');
+  pageTokens.set(pageId, { token: r.access_token, at: Date.now() });
+  return r.access_token;
+}
+
+async function fetchProfileName(pageId, psid) {
+  try {
+    const m = getSettings().meta || {};
+    const r = await graph(psid, { fields: 'name' }, await pageToken(pageId, m), m.apiVersion || config.metaApiVersion);
+    return r.name || null;
+  } catch { return null; }
+}
+
+// ส่งข้อความตอบลูกค้าผ่าน Send API
+// ภายใน 24 ชม. หลังลูกค้าทักล่าสุด = RESPONSE, 24 ชม.–7 วัน = HUMAN_AGENT (ต้องผ่าน App Review ฟีเจอร์ Human Agent)
+async function sendMessage(lead, text, lastCustomerAt) {
+  const m = getSettings().meta || {};
+  if (!m.accessToken) throw new MetaError('ยังไม่ได้เชื่อม Meta');
+  if (lead.channel !== 'Messenger') throw new MetaError(`ตอบผ่านระบบนี้ได้เฉพาะ Messenger (แชทนี้เป็น ${lead.channel || 'ช่องอื่น'})`);
+  if (!lead.psid || !lead.pageId || lead.pageId === 'unknown') {
+    throw new MetaError('แชทนี้ยังไม่มี PSID ของ Messenger — ต้องตั้ง Webhook ให้รับข้อความจากเพจก่อน (ดู docs/META-SETUP.md)');
+  }
+  const ageH = lastCustomerAt ? (Date.now() - stampMs(lastCustomerAt)) / 3600e3 : Infinity;
+  if (ageH > 7 * 24) throw new MetaError('เกิน 7 วันนับจากข้อความล่าสุดของลูกค้า Meta ไม่อนุญาตให้ตอบผ่าน API (ให้ลูกค้าทักมาใหม่ หรือติดต่อทางช่องทางอื่น)');
+  const body = { recipient: { id: lead.psid }, message: { text }, messaging_type: ageH <= 24 ? 'RESPONSE' : 'MESSAGE_TAG' };
+  if (ageH > 24) body.tag = 'HUMAN_AGENT';
+  const version = m.apiVersion || config.metaApiVersion;
+  const token = await pageToken(lead.pageId, m);
+  const res = await fetch(`https://graph.facebook.com/${version}/${lead.pageId}/messages`, {
+    method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body), signal: AbortSignal.timeout(30000),
+  });
+  let out; try { out = await res.json(); } catch { out = {}; }
+  if (!res.ok || out.error) {
+    const e = out.error || {};
+    throw new MetaError(e.message || `ส่งข้อความไม่สำเร็จ (HTTP ${res.status})`);
+  }
+  return { mid: out.message_id || null };
+}
+
+function clearCache() { cache.clear(); pageTokens.clear(); }
 
 module.exports = {
   MetaError, load, testConnection, exchangeLongLived, getSettings, saveSettings, clearCache,
-  normalizeAccountId, parseInsightRow, actionValue,
+  normalizeAccountId, parseInsightRow, actionValue, sendMessage, fetchProfileName,
 };

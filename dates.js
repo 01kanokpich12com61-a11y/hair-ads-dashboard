@@ -39,4 +39,10 @@ function resolveRange(q) {
   return { key, from, to, days, prevFrom, prevTo };
 }
 
-module.exports = { today, addDays, diffDays, eachDay, isDate, resolveRange };
+// เวลาแบบ 'YYYY-MM-DD HH:MM' (เวลาไทย) ใช้กับข้อความแชท
+function nowStamp(ms = Date.now()) {
+  return new Date(ms + config.tzOffsetHours * 3600e3).toISOString().slice(0, 16).replace('T', ' ');
+}
+function stampMs(at) { return Date.parse(String(at).replace(' ', 'T') + ':00+07:00'); }
+
+module.exports = { today, addDays, diffDays, eachDay, isDate, resolveRange, nowStamp, stampMs };

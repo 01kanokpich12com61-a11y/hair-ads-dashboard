@@ -1,6 +1,9 @@
 'use strict';
 const { addDays, eachDay } = require('./dates');
 
+// ความคืบหน้าของแชท เรียงตามคอลัมน์ใน Board
+const STATUSES = ['no_reply', 'very_poor', 'talked', 'in_progress', 'qualified'];
+
 const div = (a, b) => (b ? a / b : null);
 const round = (n, d = 2) => (n === null || n === undefined ? null : Math.round(n * 10 ** d) / 10 ** d);
 
@@ -50,7 +53,7 @@ function qualityLabel(score) {
 function listFilters(data) {
   return {
     pages: data.pages, campaigns: data.campaigns, agencies: data.agencies, reps: data.reps,
-    statuses: ['new', 'contacted', 'booked', 'closed', 'dropped'],
+    statuses: STATUSES,
   };
 }
 
@@ -108,34 +111,35 @@ function buildDashboard(data, range, q = {}) {
 
   // แชทและคุณภาพ
   const count = (arr, f) => arr.filter(f).length;
-  const resp = leadsCur.map((l) => l.firstResponseMin);
+  const resp = leadsCur.map((l) => l.firstResponseMin).filter((v) => typeof v === 'number');
   const chat = {
     leads: leadsCur.length,
     leadsPrev: leadsPrev.length,
     qualityChats: count(leadsCur, (l) => l.quality === 'good'),
     avgFirstResponse: resp.length ? round(resp.reduce((a, b) => a + b, 0) / resp.length, 1) : null,
     quality: ['good', 'average', 'poor'].map((k) => ({ key: k, count: count(leadsCur, (l) => l.quality === k) })),
-    funnel: ['new', 'contacted', 'booked', 'closed', 'dropped'].map((k) => ({ key: k, count: count(leadsCur, (l) => l.status === k) })),
+    funnel: STATUSES.map((k) => ({ key: k, count: count(leadsCur, (l) => l.status === k) })),
     costPerLead: leadsCur.length ? round(aggregate(cur).spend / leadsCur.length) : null,
   };
 
   // ทีมขาย
   const sales = data.reps.map((r) => {
     const ls = leadsCur.filter((l) => l.repId === r.id);
-    const closed = ls.filter((l) => l.status === 'closed');
+    const closed = ls.filter((l) => l.value > 0);
+    const rt = ls.map((l) => l.firstResponseMin).filter((v) => typeof v === 'number');
     return {
       id: r.id, name: r.name, leads: ls.length,
-      booked: count(ls, (l) => l.status === 'booked' || l.status === 'closed'),
+      qualified: count(ls, (l) => l.status === 'qualified'),
       closed: closed.length,
       revenue: closed.reduce((s, l) => s + l.value, 0),
       closeRate: ls.length ? round((closed.length / ls.length) * 100, 1) : null,
-      avgFirstResponse: ls.length ? round(ls.reduce((s, l) => s + l.firstResponseMin, 0) / ls.length, 1) : null,
+      avgFirstResponse: rt.length ? round(rt.reduce((s, v) => s + v, 0) / rt.length, 1) : null,
     };
   }).filter((r) => r.leads > 0);
   const revenue = sales.reduce((s, r) => s + r.revenue, 0);
 
   // ลีดที่หลุด
-  const dropped = leadsCur.filter((l) => l.status === 'dropped');
+  const dropped = leadsCur.filter((l) => l.status === 'no_reply' || l.status === 'very_poor');
   const reasons = {};
   for (const l of dropped) reasons[l.dropReason || 'ไม่ระบุ'] = (reasons[l.dropReason || 'ไม่ระบุ'] || 0) + 1;
   const adName = Object.fromEntries(data.ads.map((a) => [a.id, a.name]));
@@ -159,19 +163,41 @@ function buildDashboard(data, range, q = {}) {
   };
 }
 
-function buildBoard(data, range) {
+function leadRows(data, range) {
   const adName = Object.fromEntries(data.ads.map((a) => [a.id, a.name]));
   const repName = Object.fromEntries(data.reps.map((r) => [r.id, r.name]));
-  const leads = data.leads.filter((l) => l.date >= range.from && l.date <= range.to);
-  const columns = ['new', 'contacted', 'booked', 'closed', 'dropped'].map((status) => ({
-    status,
-    total: leads.filter((l) => l.status === status).length,
-    cards: leads.filter((l) => l.status === status).slice(0, 30).map((l) => ({
-      id: l.id, name: l.name, date: l.date, ad: adName[l.adId] || l.adId, rep: repName[l.repId] || '',
-      quality: l.quality, value: l.value, reason: l.dropReason,
-    })),
-  }));
-  return { range, columns };
+  return data.leads
+    .filter((l) => l.date >= range.from && l.date <= range.to) // นับจากวันที่เริ่มคุย
+    .map((l) => ({
+      id: l.id, name: l.name, channel: l.channel || '—', date: l.date, status: l.status,
+      ad: adName[l.adId] || '', rep: repName[l.repId] || '', value: l.value || 0, reason: l.dropReason || null,
+    }))
+    .sort((x, y) => (x.date !== y.date ? (x.date < y.date ? 1 : -1) : x.id < y.id ? 1 : -1));
 }
 
-module.exports = { buildDashboard, buildBoard, listFilters, aggregate };
+function buildBoard(data, range) {
+  const rows = leadRows(data, range);
+  return {
+    range, total: rows.length,
+    columns: STATUSES.map((status) => {
+      const c = rows.filter((r) => r.status === status);
+      return { status, total: c.length, cards: c.slice(0, 40) };
+    }),
+  };
+}
+
+function buildInbox(data, range) {
+  const rows = leadRows(data, range);
+  return { range, total: rows.length, rows: rows.slice(0, 2000) };
+}
+
+function leadRow(data, l) {
+  const ad = data.ads.find((a) => a.id === l.adId);
+  const rep = data.reps.find((r) => r.id === l.repId);
+  return {
+    id: l.id, name: l.name, channel: l.channel || '—', date: l.date, status: l.status,
+    ad: ad ? ad.name : '', rep: rep ? rep.name : '', value: l.value || 0, reason: l.dropReason || null,
+  };
+}
+
+module.exports = { buildDashboard, buildBoard, buildInbox, leadRow, listFilters, aggregate, STATUSES };

@@ -1,0 +1,98 @@
+/* หน้าใหม่: ตอบแชท, ตามลูกค้า, Review, Audit — โหลดต่อจาก styles.css */
+.topbar .nav { min-width: 0; overflow-x: auto; scrollbar-width: none; flex-wrap: nowrap; }
+.topbar .nav::-webkit-scrollbar { display: none; }
+.topbar .nav a { white-space: nowrap; }
+
+.nowrap { white-space: nowrap; }
+.click-row { cursor: pointer; }
+.click-row:hover td { background: rgba(68, 96, 47, .06); }
+.fu-last { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pills { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* ช่องตอบแชท */
+.composer-wrap { padding: 10px 14px 12px; border-top: 1px solid #e5e7e3; background: #fff; }
+.reply-form { display: flex; gap: 8px; align-items: flex-end; }
+.reply-form textarea, .fu-form input[type=text], .rv-form textarea {
+  flex: 1; font: inherit; font-size: 14px; padding: 9px 12px; border: 1px solid #d5d9d3; border-radius: 12px; resize: none; background: #fff; color: inherit; min-width: 0;
+}
+.reply-form textarea:focus, .fu-form input:focus, .rv-form textarea:focus { outline: 2px solid rgba(68, 96, 47, .35); outline-offset: 0; }
+.reply-form .btn { white-space: nowrap; }
+.reply-form .btn .icon { width: 16px; height: 16px; margin-right: 6px; }
+.reply-note { font-size: 12px; color: #6b746e; margin-top: 6px; }
+.reply-msg { margin-top: 8px; padding: 8px 12px; font-size: 13px; }
+
+/* แผงเครื่องมือใต้แชทใน drawer */
+.drawer-tools { max-height: 55%; overflow-y: auto; border-top: 1px solid #e5e7e3; padding: 12px 16px 16px; background: #fff; display: flex; flex-direction: column; gap: 14px; }
+.drawer-tools h4, .info-tools h4 { margin: 0 0 8px; font-size: 14px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.fu-row { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.fu-row .date-in { flex: 0 0 auto; }
+.fu-form .row-actions, .rv-form .row-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+.info-tools { display: flex; flex-direction: column; gap: 12px; padding-top: 6px; }
+
+/* ฟอร์มรีวิว */
+.rv-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px dashed #e5e7e3; font-size: 13.5px; }
+.rv-scale { display: flex; gap: 4px; flex-shrink: 0; }
+.rv-scale label { cursor: pointer; }
+.rv-scale input { position: absolute; opacity: 0; pointer-events: none; }
+.rv-scale span { display: inline-flex; width: 30px; height: 30px; align-items: center; justify-content: center; border: 1px solid #d5d9d3; border-radius: 8px; font-size: 13px; background: #fff; }
+.rv-scale input:checked + span { background: #44602f; border-color: #44602f; color: #fff; font-weight: 600; }
+.rv-scale input:focus-visible + span { outline: 2px solid #2a56b8; outline-offset: 1px; }
+.rv-form textarea { width: 100%; margin-top: 10px; box-sizing: border-box; }
+.rv-hint { color: #6b746e; font-size: 12px; }
+@media (max-width: 720px) { .rv-row { flex-direction: column; align-items: flex-start; } }
+
+/* จัดการผู้ใช้ (Setting) */
+.users-form textarea { width: 100%; font: inherit; font-size: 14px; padding: 10px 14px; border: 1px solid #d8d4c8; border-radius: 12px; background: #fff; resize: vertical; box-sizing: border-box; }
+.users-form textarea:focus { outline: 0; border-color: var(--brand-mid); box-shadow: 0 0 0 3px rgba(94, 130, 67, .22); }
+.users-form select { appearance: none; -webkit-appearance: none; border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 10px 18px; font-weight: 500; }
+.pw-list { margin: 10px 0; padding: 10px 14px; background: #fff; border-radius: 10px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13.5px; white-space: pre-wrap; user-select: all; }
+.skip-list { margin: 6px 0 0; padding-left: 20px; }
+
+/* SLA ตอบแชท (Board) */
+.sla-panel .sla-detail { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line-soft); }
+.sla-panel .sla-detail h4 { margin: 0 0 10px; font-size: 15px; }
+.sla-panel tr.sel-row td { background: var(--mint); }
+.sla-panel th { cursor: default; }
+
+/* เมนูหลักมี 9 รายการ: ถ้าหน้าจอไม่กว้างพอให้ขึ้นบรรทัดที่สอง ไม่ให้ Setting ถูกตัดหายไป */
+@media (max-width: 1700px) {
+  .topbar { height: auto; flex-wrap: wrap; row-gap: 4px; padding-top: 10px; padding-bottom: 10px; }
+  .brand { border: 0; padding-right: 0; }
+  .topbar .nav { order: 5; width: 100%; }
+}
+@media (max-width: 1100px) { .topbar .nav a { padding: 8px 12px; } }
+
+/* ── หน้า Upload (นำเข้า Leads จากโฆษณา) ── */
+.upload-zone {
+  border: 2px dashed var(--line);
+  border-radius: var(--r-card);
+  padding: 40px 24px;
+  text-align: center;
+  color: var(--muted);
+  background: #faf9f5;
+  transition: border-color .15s, background .15s;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+.upload-zone:hover, .upload-zone.drag-over {
+  border-color: var(--brand);
+  background: var(--mint);
+  color: var(--brand-deep);
+}
+.upload-zone .icon { width: 36px; height: 36px; stroke-width: 1.6; }
+.upload-zone b { font-size: 16px; color: var(--ink); }
+.upload-zone input[type=file] { display: none; }
+.upload-code-hint {
+  background: #f4f2ec;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  white-space: pre-wrap;
+  margin: 6px 0 0;
+}
